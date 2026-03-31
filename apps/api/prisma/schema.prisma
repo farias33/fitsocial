@@ -1,0 +1,159 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Identity ────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String?  @map("password_hash")
+  displayName  String   @map("display_name")
+  avatarUrl    String?  @map("avatar_url")
+  bio          String?
+  role         UserRole @default(USER)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  participants Participant[]
+  workouts     Workout[]
+  reactions    Reaction[]
+  comments     Comment[]
+
+  @@index([email])
+  @@index([username])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+// ─── Challenge ───────────────────────────────────────────────────────────────
+
+model Challenge {
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  startDate   DateTime        @map("start_date")
+  endDate     DateTime        @map("end_date")
+  status      ChallengeStatus @default(UPCOMING)
+  createdById String          @map("created_by_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  participants Participant[]
+  workouts     Workout[]
+
+  @@index([status])
+  @@index([startDate])
+  @@map("challenges")
+}
+
+enum ChallengeStatus {
+  UPCOMING
+  ACTIVE
+  ENDED
+}
+
+model Participant {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  challengeId String   @map("challenge_id")
+  joinedAt    DateTime @default(now()) @map("joined_at")
+
+  user      User      @relation(fields: [userId], references: [id])
+  challenge Challenge @relation(fields: [challengeId], references: [id])
+
+  @@unique([userId, challengeId])
+  @@index([challengeId])
+  @@map("participants")
+}
+
+// ─── Workout ─────────────────────────────────────────────────────────────────
+
+model Workout {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  challengeId String   @map("challenge_id")
+  title       String
+  description String?
+  points      Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user      User      @relation(fields: [userId], references: [id])
+  challenge Challenge @relation(fields: [challengeId], references: [id])
+  media     WorkoutMedia[]
+  reactions Reaction[]
+  comments  Comment[]
+
+  @@index([userId])
+  @@index([challengeId])
+  @@index([createdAt(sort: Desc)])
+  @@map("workouts")
+}
+
+model WorkoutMedia {
+  id           String   @id @default(uuid())
+  workoutId    String   @map("workout_id")
+  thumbnailUrl String?  @map("thumbnail_url")
+  mediumUrl    String?  @map("medium_url")
+  originalUrl  String   @map("original_url")
+  status       MediaStatus @default(PROCESSING)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  workout Workout @relation(fields: [workoutId], references: [id])
+
+  @@map("workout_media")
+}
+
+enum MediaStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
+// ─── Social ──────────────────────────────────────────────────────────────────
+
+model Reaction {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  workoutId String   @map("workout_id")
+  emoji     String   @default("💪")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id])
+  workout Workout @relation(fields: [workoutId], references: [id])
+
+  @@unique([userId, workoutId])
+  @@index([workoutId])
+  @@map("reactions")
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  workoutId String   @map("workout_id")
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user    User    @relation(fields: [userId], references: [id])
+  workout Workout @relation(fields: [workoutId], references: [id])
+
+  @@index([workoutId])
+  @@map("comments")
+}
